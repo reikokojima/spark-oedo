@@ -1,12 +1,15 @@
-#SERVER_TYPE = "local"
+SERVER_TYPE = "local"
 #SERVER_TYPE = "aws"
-SERVER_TYPE = "cluster"
+#SERVER_TYPE = "cluster"
 
 if SERVER_TYPE == "local":
     MASTER = "local[*]"
-    DATA_PATH = "file:///home/ryokoyam/spark-oedo/scratch"
-    MAPFILE_PATH = "file:///home/ryokoyam/spark-oedo/map_files"
-    PRMFILE_PATH = "file:///home/ryokoyam/spark-oedo/prm"
+    DATA_PATH = "/home/sharaq/sh12s24"
+    MAPFILE_PATH = "/home/sharaq/spark-oedo/map_files"
+    PRMFILE_PATH = "/home/sharaq/spark-oedo/prm"
+#    DATA_PATH = "file:///home/sh12s24"
+#    MAPFILE_PATH = "file:///home/sharaq/spark-oedo/map_files"
+#    PRMFILE_PATH = "file:///home/sharaq/spark-oedo/prm"
 
 elif SERVER_TYPE == "aws":
     DATA_PATH = "s3://data-analysis"
@@ -23,4 +26,4 @@ elif SERVER_TYPE == "cluster":
 
 BATCH_SIZE = 30000
 #ID_COLNAME = "ts"
-ID_COLNAME = "event_id"
+ID_COLNAME = "event_number"

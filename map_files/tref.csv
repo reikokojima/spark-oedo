@@ -1,4 +1,4 @@
-cat,id,dev,fp,det,geo,ch
+detname,id,dev,fp,det,geo,ch
 "tref", 0,  0, 63,  1, 7, 0
 "tref", 1,  0, 63,  1, 8, 0
 "tref", 2,  0, 63,  3, 6, 31

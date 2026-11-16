@@ -1,6 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.functions import explode, col, arrays_zip, collect_list, DataFrame
+from pyspark.sql.functions import explode, col, arrays_zip, collect_list
+from pyspark.sql import DataFrame
 
 def ToFloat(dataFrame: DataFrame, colName: str, p0: float = 0., p1: float = 1.) -> DataFrame:
     """
