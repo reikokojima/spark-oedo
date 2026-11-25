@@ -1,5 +1,6 @@
 from pyspark.sql.functions import posexplode, row_number, lit
 from pyspark.sql import DataFrame
+from pyspark.sql.types import ArrayType
 from pyspark.ml.feature import Bucketizer
 from pyspark.sql.window import Window
 import matplotlib.pyplot as plt
@@ -157,9 +158,30 @@ def Hist2D_floor(
     """
     Spark DataFrame 用 軽量2D histogram
     Bucketizer を使わず floor ベースで binning
+
+    Accepts two scalar columns or two arrays aligned by hit index. Array
+    elements are paired within each row before binning; null or unpaired
+    elements are ignored. Returns counts with shape (nbins_y, nbins_x).
     """
 
     xcol, ycol = colName
+
+    x_is_array = isinstance(df.schema[xcol].dataType, ArrayType)
+    y_is_array = isinstance(df.schema[ycol].dataType, ArrayType)
+    if x_is_array != y_is_array:
+        raise ValueError("Hist2D_floor requires two scalar columns or two aligned array columns")
+    if x_is_array:
+        # Zip before exploding to preserve hit pairs without a join or a
+        # Cartesian product. Shorter arrays are padded with nulls, which the
+        # binning filter below discards.
+        df = (
+            df.select(F.col(xcol).alias("_hist_x"), F.col(ycol).alias("_hist_y"))
+            .select(F.explode(F.arrays_zip("_hist_x", "_hist_y")).alias("_hist_hit"))
+            .select(
+                F.col("_hist_hit._hist_x").alias(xcol),
+                F.col("_hist_hit._hist_y").alias(ycol),
+            )
+        )
 
     nbins_x, nbins_y = nbins
 
@@ -172,28 +194,21 @@ def Hist2D_floor(
     # -----------------------------
     # bin index 計算
     # -----------------------------
-    hist_df = (
-        df
-        .filter(
-            F.col(xcol).isNotNull() &
-            F.col(ycol).isNotNull()
-        )
-        .withColumn(
-            "bin_x",
-            F.floor((F.col(xcol) - xmin) / xwidth)
-        )
-        .withColumn(
-            "bin_y",
-            F.floor((F.col(ycol) - ymin) / ywidth)
-        )
+    bin_x = F.floor((F.col(xcol) - xmin) / xwidth)
+    bin_y = F.floor((F.col(ycol) - ymin) / ywidth)
+    in_range = (
+        (F.col(xcol) >= xmin) & (F.col(xcol) < xmax) &
+        (F.col(ycol) >= ymin) & (F.col(ycol) < ymax) &
+        (bin_x >= 0) & (bin_x < nbins_x) &
+        (bin_y >= 0) & (bin_y < nbins_y)
     )
-
-    # 範囲内のみ
-    hist_df = hist_df.filter(
-        (F.col("bin_x") >= 0) &
-        (F.col("bin_x") < nbins_x) &
-        (F.col("bin_y") >= 0) &
-        (F.col("bin_y") < nbins_y)
+    # Keep bounds checking and binning in one projection. A separate filter
+    # can cause Spark to evaluate an upstream Python UDF again for the keys.
+    # Collapse invalid pairs to one sentinel bin, keeping collection bounded
+    # by nbins_x * nbins_y + 1 even when many values lie outside the range.
+    hist_df = df.select(
+        F.when(in_range, bin_x).otherwise(-1).alias("bin_x"),
+        F.when(in_range, bin_y).otherwise(-1).alias("bin_y"),
     )
 
     # -----------------------------
@@ -216,7 +231,8 @@ def Hist2D_floor(
     for row in data:
         bx = int(row["bin_x"])
         by = int(row["bin_y"])
-        hist[by, bx] = row["count"]
+        if 0 <= bx < nbins_x and 0 <= by < nbins_y:
+            hist[by, bx] = row["count"]
 
     # -----------------------------
     # plot

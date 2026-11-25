@@ -1,7 +1,7 @@
 # [category_name],[id],[device],[focal_plane],[detector],[geometry],[channel]
 cat,id,dev,fp,det,geo,ch
 # F3 Dia V1290
-"dia3pad", 0,  11,   3,  31,   0,  6
+"dia3pad", 0,  11,   3,  31,   0,  14
 "dia3stripL", 0,  11,   3,  31,   0,   7
 "dia3stripL", 1,  11,   3,  31,   0,   2
 "dia3stripL", 2,  11,   3,  31,   0,   4

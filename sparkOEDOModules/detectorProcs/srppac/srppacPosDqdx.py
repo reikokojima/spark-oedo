@@ -4,7 +4,7 @@ from typing import Callable
 from pyspark.sql.window import Window
 from sparkOEDOModules.procModules import constants
 
-def srppacPosDqdx(dataFrame: DataFrame, c0UDF: Callable[[Column],Column], center: float, stripWidth: float, detOffset: float = 0, turned: bool = False):
+def srppacPosDqdx(dataFrame: DataFrame, c0UDF: Callable[[Column],Column], max_hit: int, center: float, stripWidth: float, detOffset: float = 0, turned: bool = False):
     """
     Calculate position from SRPPAC raw data
 
@@ -12,6 +12,7 @@ def srppacPosDqdx(dataFrame: DataFrame, c0UDF: Callable[[Column],Column], center
     ----------
     dataFrame: input dataframe that contains event_id, id, charge, timing
     c0UDF: udf function for conversion table
+    max_hit: Maximum number of hits allowed per event
     center: Center strip position
     stripWidth: strip width of the PPAC
     detOffset: Offset of the detector position (default: 0)
@@ -20,7 +21,7 @@ def srppacPosDqdx(dataFrame: DataFrame, c0UDF: Callable[[Column],Column], center
 
     Returns
     -------
-    Dataframe with two columns: event_id and position
+    Dataframe with event ID, position, hit count (rank), and converted charge ratio
     """
     # Step 1: Identify c0, c1, id0, id1 for each event_id
     # Define a window partition by event_id and order by charge descending
@@ -40,13 +41,19 @@ def srppacPosDqdx(dataFrame: DataFrame, c0UDF: Callable[[Column],Column], center
         F.max("c0").alias("c0"),
         F.max("c1").alias("c1"),
         F.max("id0").alias("id0"),
-        F.max("id1").alias("id1")
+        F.max("id1").alias("id1"),
+        # The largest row number is the total hit count for this event.
+        F.max("rank").alias("rank")
     )
 
-    # Step 2: Implement the calculation for "pos"
-    df_with_c0_c1 = df_with_c0_c1.withColumn("c0c1",(F.col("c0") - F.col("c1")) / (F.col("c0") + F.col("c1")))
-    df_with_c0_c1 = df_with_c0_c1.withColumn("c0c1_conv", c0UDF(F.col("c0c1")))
-    df_with_pos = df_with_c0_c1.withColumn(
+    # Step 2: select hitsize and id series
+    df_hitid=df_with_c0_c1.filter(F.col("rank")<=max_hit)
+    df_hitid=df_hitid.filter(F.abs(F.col("id0")-F.col("id1"))==1)
+
+    # Step 3: Implement the calculation for "pos"
+    df_hitid = df_hitid.withColumn("c0c1",(F.col("c0") - F.col("c1")) / (F.col("c0") + F.col("c1")))
+    df_hitid = df_hitid.withColumn("c0c1_conv", c0UDF(F.col("c0c1")))
+    df_with_pos = df_hitid.withColumn(
         "pos",
         (F.when(F.lit(turned), -1).otherwise(1)) *
         (
@@ -58,6 +65,6 @@ def srppacPosDqdx(dataFrame: DataFrame, c0UDF: Callable[[Column],Column], center
     )
 
     # Select the desired columns along with the new "pos" column
-    df_final = df_with_pos.select(constants.ID_COLNAME, "pos", "c0c1_conv")
+    df_final = df_with_pos.select(constants.ID_COLNAME, "pos","c0c1_conv")
 
     return df_final

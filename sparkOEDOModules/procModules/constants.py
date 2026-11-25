@@ -4,7 +4,7 @@ SERVER_TYPE = "local"
 
 if SERVER_TYPE == "local":
     MASTER = "local[*]"
-    DATA_PATH = "/home/sharaq/sh12s24"
+    DATA_PATH = "/home/sharaq/sh12s24/ridf"
     MAPFILE_PATH = "/home/sharaq/spark-oedo/map_files"
     PRMFILE_PATH = "/home/sharaq/spark-oedo/prm"
 #    DATA_PATH = "file:///home/sh12s24"
